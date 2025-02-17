@@ -1,0 +1,469 @@
+#!/usr/bin/env python3
+
+
+'''
+We get inspirations of Tower of Hanoi algorithm from the website below.
+This is also on the lab manual.
+Source: https://www.cut-the-knot.org/recurrence/hanoi.shtml
+'''
+
+
+import os
+import argparse
+import copy
+import time
+import rospy
+import rospkg
+import numpy as np
+import yaml
+import sys
+from math import pi
+from lab2_header import *
+
+
+# 20Hz
+SPIN_RATE = 20
+
+
+# UR3 home location
+home = np.radians([120, -90, 90, -90, -90, 0])
+
+
+# For reference, Q13 means that the tower is at location 1, position 3. Position 1 is the top while position 3 is the bottom.
+# Hanoi tower location 1
+Q11 = [162.59*pi/180.0, -65.64*pi/180.0, 109.92*pi/180.0, -133.85*pi/180.0, -90.13*pi/180.0, 48.32*pi/180.0]
+Q12 = [162.59*pi/180.0, -58.07*pi/180.0, 112.43*pi/180.0, -143.92*pi/180.0, -90.14*pi/180.0, 48.31*pi/180.0]
+Q13 = [162.60*pi/180.0, -49.79*pi/180.0, 113.09*pi/180.0, -152.86*pi/180.0, -90.13*pi/180.0, 48.3*pi/180.0]
+
+
+# Hanoi tower location 2
+Q21 = [179.1*pi/180.0, -61.87*pi/180.0, 105.87*pi/180.0, -133.58*pi/180.0, -90.02*pi/180.0, 64.83*pi/180.0]
+Q22 = [179.10*pi/180.0, -57.05*pi/180.0, 107.52*pi/180.0, -140.05*pi/180.0, -90.02*pi/180.0, 64.81*pi/180.0]
+Q23 = [179.10*pi/180.0, -49.8*pi/180.0, 108.44*pi/180.0, -148.21*pi/180.0, -90.01*pi/180.0, 64.8*pi/180.0]
+
+
+# Hanoi tower location 3
+Q31 = [195.02*pi/180.0, -54.5*pi/180.0, 91.03*pi/180.0, -126.16*pi/180.0, -89.94*pi/180.0, 80.75*pi/180.0]
+Q32 = [195.03*pi/180.0, -48.63*pi/180.0, 93.25*pi/180.0, -134.24*pi/180.0, -89.92*pi/180.0, 80.74*pi/180.0]
+Q33 = [195.03*pi/180.0, -43.82*pi/180.0, 93.85*pi/180.0, -139.66*pi/180.0, -89.92*pi/180.0, 80.73*pi/180.0]
+
+
+tower_0_high_point = [166.32*pi/180.0, -79.47*pi/180.0, 77.53*pi/180.0, -85.44*pi/180.0, -88.49*pi/180.0, 84.30*pi/180.0]
+tower_1_high_point = [183.43*pi/180.0, -75.93*pi/180.0, 79.75*pi/180.0, -91.79*pi/180.0, -87.79*pi/180.0, 101.41*pi/180.0]
+tower_2_high_point = [196.26*pi/180.0, -66.77*pi/180.0, 66.34*pi/180.0, -89.79*pi/180.0, -83.84*pi/180.0, 107.45*pi/180.0]
+thetas = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+
+digital_in_0 = 0
+analog_in_0 = 0
+
+
+suction_on = True
+suction_off = False
+current_io_0 = False
+current_position_set = False
+
+
+# UR3 current position, using home position for initialization
+current_position = copy.deepcopy(home)
+
+
+############## Your Code Start Here ##############
+"""
+TODO: Initialize Q matrix
+"""
+
+
+# In Q matrix, column is height, row is location of base
+Q = [ [Q11, Q12, Q13], \
+     [Q21, Q22, Q23], \
+     [Q31, Q32, Q33] ]
+
+high_point = [tower_0_high_point, tower_1_high_point, tower_2_high_point]
+top = 0
+middle = 1
+bottom = 2
+############### Your Code End Here ###############
+
+
+############## Your Code Start Here ##############
+
+
+"""
+TODO: define a ROS topic callback funtion for getting the state of suction cup
+Whenever ur3/gripper_input publishes info this callback function is called.
+"""
+# DIGIN is 1 when it acquires a block, 0 else. Probably will need to wait
+def gripper_callback(msg):
+   global is_gripping
+   is_gripping = msg.DIGIN
+
+
+
+
+
+
+############### Your Code End Here ###############
+
+
+
+
+"""
+Whenever ur3/position publishes info, this callback function is called.
+"""
+def position_callback(msg):
+
+
+   global thetas
+   global current_position
+   global current_position_set
+
+
+   thetas[0] = msg.position[0]
+   thetas[1] = msg.position[1]
+   thetas[2] = msg.position[2]
+   thetas[3] = msg.position[3]
+   thetas[4] = msg.position[4]
+   thetas[5] = msg.position[5]
+
+
+   current_position[0] = thetas[0]
+   current_position[1] = thetas[1]
+   current_position[2] = thetas[2]
+   current_position[3] = thetas[3]
+   current_position[4] = thetas[4]
+   current_position[5] = thetas[5]
+
+
+   current_position_set = True
+
+
+
+
+def gripper(pub_cmd, loop_rate, io_0):
+
+
+   global SPIN_RATE
+   global thetas
+   global current_io_0
+   global current_position
+
+
+   error = 0
+   spin_count = 0
+   at_goal = 0
+
+
+   current_io_0 = io_0
+
+
+   driver_msg = command()
+   driver_msg.destination = current_position
+   driver_msg.v = 1.0
+   driver_msg.a = 1.0
+   driver_msg.io_0 = io_0
+   pub_cmd.publish(driver_msg)
+
+
+   while(at_goal == 0):
+
+
+       if( abs(thetas[0]-driver_msg.destination[0]) < 0.0005 and \
+           abs(thetas[1]-driver_msg.destination[1]) < 0.0005 and \
+           abs(thetas[2]-driver_msg.destination[2]) < 0.0005 and \
+           abs(thetas[3]-driver_msg.destination[3]) < 0.0005 and \
+           abs(thetas[4]-driver_msg.destination[4]) < 0.0005 and \
+           abs(thetas[5]-driver_msg.destination[5]) < 0.0005 ):
+
+
+           at_goal = 1
+
+
+       loop_rate.sleep()
+
+
+       if(spin_count >  SPIN_RATE*5):
+
+
+           pub_cmd.publish(driver_msg)
+           rospy.loginfo("Just published again driver_msg")
+           spin_count = 0
+
+
+       spin_count = spin_count + 1
+
+
+   return error
+
+
+
+
+def move_arm(pub_cmd, loop_rate, dest, vel, accel):
+
+
+   global thetas
+   global SPIN_RATE
+
+
+   error = 0
+   spin_count = 0
+   at_goal = 0
+
+
+   driver_msg = command()
+   driver_msg.destination = dest
+   driver_msg.v = vel
+   driver_msg.a = accel
+   driver_msg.io_0 = current_io_0
+   pub_cmd.publish(driver_msg)
+
+
+   loop_rate.sleep()
+
+
+   while(at_goal == 0):
+
+
+       if( abs(thetas[0]-driver_msg.destination[0]) < 0.0005 and \
+           abs(thetas[1]-driver_msg.destination[1]) < 0.0005 and \
+           abs(thetas[2]-driver_msg.destination[2]) < 0.0005 and \
+           abs(thetas[3]-driver_msg.destination[3]) < 0.0005 and \
+           abs(thetas[4]-driver_msg.destination[4]) < 0.0005 and \
+           abs(thetas[5]-driver_msg.destination[5]) < 0.0005 ):
+
+
+           at_goal = 1
+           rospy.loginfo("Goal is reached!")
+
+
+       loop_rate.sleep()
+
+
+       if(spin_count >  SPIN_RATE*5):
+
+
+           pub_cmd.publish(driver_msg)
+           rospy.loginfo("Just published again driver_msg")
+           spin_count = 0
+
+
+       spin_count = spin_count + 1
+
+
+   return error
+
+
+
+
+############## Your Code Start Here ##############
+
+
+def move_block(pub_cmd, loop_rate, start_loc, start_height, \
+              end_loc, end_height):
+   global Q
+
+
+   ### Hint: Use the Q array to map out your towers by location and "height".
+   #move from start_loc, start_height to end_loc, end_height
+   #please modify the following:
+   suction_on = True
+
+   # go to start location and succ
+   move_arm(pub_cmd, loop_rate, high_point[start_loc], 1.0, 1.0)
+   move_arm(pub_cmd, loop_rate, Q[start_loc][start_height], 1.0, 1.0)
+   gripper(pub_cmd, loop_rate, 1)
+
+
+   #check if sucking
+   time.sleep(1)
+   if (is_gripping == False):
+       gripper(pub_cmd, loop_rate, 0)
+       sys.stderr("Block was not acquired, please reset workspace and run again.")
+   else:
+       print("Yes grip")
+   move_arm(pub_cmd, loop_rate, high_point[start_loc], 1.0, 1.0)   
+
+
+   # go to end location and release
+   move_arm(pub_cmd, loop_rate, high_point[end_loc], 1.0, 1.0) 
+   move_arm(pub_cmd, loop_rate, Q[end_loc][end_height], 1.0, 1.0)
+   gripper(pub_cmd, loop_rate, 0)
+   move_arm(pub_cmd, loop_rate, high_point[end_loc], 1.0, 1.0) 
+
+   error = 0
+   return error
+
+
+
+
+############### Your Code End Here ###############
+
+
+
+
+def main():
+
+
+   global home
+   global Q
+   global SPIN_RATE
+
+
+   # Initialize ROS node
+   rospy.init_node('lab2node')
+
+
+   # Initialize publisher for ur3/command with buffer size of 10
+   pub_command = rospy.Publisher('ur3/command', command, queue_size=10)
+
+
+   # Initialize subscriber to ur3/position and callback fuction
+   # each time data is published
+   sub_position = rospy.Subscriber('ur3/position', position, position_callback)
+
+
+   ############## Your Code Start Here ##############
+   # TODO: define a ROS subscriber for ur3/gripper_input message and corresponding callback function
+   gripper_outcome = rospy.Subscriber('ur3/gripper_input', gripper_input, gripper_callback)
+
+
+   ############### Your Code End Here ###############
+
+
+  
+   ############## Your Code Start Here ##############
+   # TODO: modify the code below so that program can get user input
+   input_done = 0
+   starting_tower_loc = 0
+   ending_tower_loc = 0
+
+
+   while(not input_done):
+       input_string = input("Enter starting tower location <Either 0 1 2 or 3 u suck to quit> ")
+       print("You entered " + input_string + "\n")
+
+
+       if(int(input_string) == 0):
+           starting_tower_loc = 0
+           input_done = 1
+       elif (int(input_string) == 1):
+           starting_tower_loc = 1
+           input_done = 1
+       elif (int(input_string) == 2):
+           starting_tower_loc= 2
+           input_done = 1
+       elif (int(input_string) == 3):
+           print("Quitting... ")
+           sys.exit()
+       else:
+           print("Please just enter the character 1 2 3 or 0 to quit \n\n")
+
+
+   input_done = 0
+   while(not input_done):
+       input_string = input("Enter ending location <Either 0 1 2 or 3 u suck to quit> ")
+       print("You entered " + input_string + "\n")
+
+
+       if (int(input_string) == starting_tower_loc):
+           print("This location is already in use. Please try again.")
+       elif(int(input_string) == 0):
+           ending_tower_loc = 0
+           input_done = 1
+       elif (int(input_string) == 1):
+           ending_tower_loc = 1
+           input_done = 1
+       elif (int(input_string) == 2):
+           ending_tower_loc= 2
+           input_done = 1
+       elif (int(input_string) == 3):
+           print("Quitting... ")
+           sys.exit()
+       else:
+           print("Please just enter the character 1 2 3 or 0 to quit \n\n")
+
+
+   intermediary_tower_loc = 3 - starting_tower_loc - ending_tower_loc
+
+
+
+
+
+
+   ############### Your Code End Here ###############
+
+
+   # Check if ROS is ready for operation
+   while(rospy.is_shutdown()):
+       print("ROS is shutdown!")
+
+
+   rospy.loginfo("Sending Goals ...")
+
+
+   loop_rate = rospy.Rate(SPIN_RATE)
+
+
+   ############## Your Code Start Here ##############
+   # TODO: modify the code so that UR3 can move tower accordingly from user input
+
+
+   # while(loop_count > 0):
+
+
+   #     move_arm(pub_command, loop_rate, home, 4.0, 4.0)
+
+
+   #     rospy.loginfo("Sending goal 1 ...")
+   #     move_arm(pub_command, loop_rate, Q[0][0], 4.0, 4.0)
+
+
+   #     gripper(pub_command, loop_rate, suction_on)
+   #     # Delay to make sure suction cup has grasped the block
+   #     time.sleep(1.0)
+
+
+   #     rospy.loginfo("Sending goal 2 ...")
+   #     move_arm(pub_command, loop_rate, Q[1][1], 4.0, 4.0)
+
+
+   #     rospy.loginfo("Sending goal 3 ...")
+   #     move_arm(pub_command, loop_rate, Q[2][0], 4.0, 4.0)
+
+
+   #     loop_count = loop_count - 1
+
+
+   # gripper(pub_command, loop_rate, suction_off)
+
+
+   move_block(pub_command, loop_rate, starting_tower_loc, top, \
+              ending_tower_loc, bottom)
+   move_block(pub_command, loop_rate, starting_tower_loc, middle, \
+              intermediary_tower_loc, bottom)
+   move_block(pub_command, loop_rate, ending_tower_loc, bottom, \
+              intermediary_tower_loc, middle)
+   move_block(pub_command, loop_rate, starting_tower_loc, bottom, \
+              ending_tower_loc, bottom)
+   move_block(pub_command, loop_rate, intermediary_tower_loc, middle, \
+              starting_tower_loc, bottom)
+   move_block(pub_command, loop_rate, intermediary_tower_loc, bottom, \
+              ending_tower_loc, middle)
+   move_block(pub_command, loop_rate, starting_tower_loc, bottom, \
+              ending_tower_loc, top)
+
+
+   ############### Your Code End Here ###############
+
+
+
+
+if __name__ == '__main__':
+
+
+   try:
+       main()
+   # When Ctrl+C is executed, it catches the exception
+   except rospy.ROSInterruptException:
+       pass
+
