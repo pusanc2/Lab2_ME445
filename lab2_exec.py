@@ -24,10 +24,20 @@ SPIN_RATE = 20
 # UR3 home location
 home = np.radians([120, -90, 90, -90, -90, 0])
 
-# Hanoi tower location 1
-Q11 = [120*pi/180.0, -56*pi/180.0, 124*pi/180.0, -158*pi/180.0, -90*pi/180.0, 0*pi/180.0]
-Q12 = [120*pi/180.0, -64*pi/180.0, 123*pi/180.0, -148*pi/180.0, -90*pi/180.0, 0*pi/180.0]
-Q13 = [120*pi/180.0, -72*pi/180.0, 120*pi/180.0, -137*pi/180.0, -90*pi/180.0, 0*pi/180.0]
+# Hanoi tower location 1 (3 is top and 1 is bottom for the Q coordinates)
+Q11 = [149.78*pi/180.0, -55.13*pi/180.0, 120.66*pi/180.0, -156.03*pi/180.0, -90.5*pi/180.0, 59.95*pi/180.0]
+Q12 = [149.80*pi/180.0, -63.12*pi/180.0, 119.73*pi/180.0, -147.11*pi/180.0, -90.44*pi/180.0, 59.87*pi/180.0]
+Q13 = [149.83*pi/180.0, -69.92*pi/180.0, 117.53*pi/180.0, -138.11*pi/180.0, -90.39*pi/180.0, 59.80*pi/180.0]
+Q21 = [172.84*pi/180.0, -54.70*pi/180.0, 118.16*pi/180.0, -153.63*pi/180.0, -91.85*pi/180.0, 82.54*pi/180.0]
+Q22 = [172.86*pi/180.0, -61.82*pi/180.0, 117.27*pi/180.0, -145.62*pi/180.0, -91.80*pi/180.0, 82.48*pi/180.0]
+Q23 = [172.42*pi/180.0, -68.83*pi/180.0, 115.13*pi/180.0, -136.33*pi/180.0, -90.51*pi/180.0, 82.37*pi/180.0]
+Q31 = [194.53*pi/180.0, -48.50*pi/180.0, 101.58*pi/180.0, -141.51*pi/180.0, -91.63*pi/180.0, 104.25*pi/180.0]
+Q32 = [194.55*pi/180.0, -54.67*pi/180.0, 100.51*pi/180.0, -134.29*pi/180.0, -91.60*pi/180.0, 104.18*pi/180.0]
+Q33 = [194.57*pi/180.0, -59.68*pi/180.0, 98.40*pi/180.0, -127.13*pi/180.0, -91.57*pi/180.0, 104.10*pi/180.0]
+
+safe_point_1 = [149.86*pi/180.0, -75.73*pi/180.0, 114.08*pi/180.0, -128.86*pi/180.0, -90.35*pi/180.0, 59.71*pi/180.0]
+safe_point_2 = [172.44*pi/180.0, -73.72*pi/180.0, 112.21*pi/180.0, -128.51*pi/180.0, -90.5*pi/180.0, 82.3*pi/180.0]
+safe_point_3 = [194.59*pi/180.0, -63.42*pi/180.0, 95.74*pi/180.0, -120.78*pi/180.0, -91.55*pi/180.0, 104.03*pi/180.0]
 
 thetas = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
@@ -47,9 +57,9 @@ current_position = copy.deepcopy(home)
 TODO: Initialize Q matrix
 """
 # Define the angles for Q21,22,23 and Q31,32,33
-Q = [ [Q11, Q21, Q31], \
-      [Q12, Q22, Q32], \
-      [Q13, Q23, Q33] ]
+Q = [ [Q11, Q12, Q13], \
+      [Q21, Q22, Q23], \
+      [Q31, Q32, Q33] ]
 ############### Your Code End Here ###############
 
 ############## Your Code Start Here ##############
@@ -58,6 +68,10 @@ Q = [ [Q11, Q21, Q31], \
 TODO: define a ROS topic callback funtion for getting the state of suction cup
 Whenever ur3/gripper_input publishes info this callback function is called.
 """
+gripper_status = 0
+def gripper_callback(msg):
+    global gripper_status
+    gripper_status = msg.analog
 
 ############### Your Code End Here ###############
 
@@ -185,7 +199,6 @@ def move_block(pub_cmd, loop_rate, start_loc, start_height, \
     error = 0
 
 
-
     return error
 
 
@@ -218,32 +231,52 @@ def main():
     ############## Your Code Start Here ##############
     # TODO: modify the code below so that program can get user input
 
+    #Setting the starting location
     input_done = 0
-    loop_count = 0
+    starting_location = 0
 
     while(not input_done):
-        input_string = input("Enter number of loops <Either 1 2 3 or 0 to quit> ")
+        input_string = input("Enter the starting location <Either 1 2 3 or 0 to quit> ")
         print("You entered " + input_string + "\n")
 
         if(int(input_string) == 1):
             input_done = 1
-            loop_count = 1
+            starting_location = 0
         elif (int(input_string) == 2):
             input_done = 1
-            loop_count = 2
+            starting_location = 1
         elif (int(input_string) == 3):
             input_done = 1
-            loop_count = 3
+            starting_location = 2
         elif (int(input_string) == 0):
             print("Quitting... ")
             sys.exit()
         else:
             print("Please just enter the character 1 2 3 or 0 to quit \n\n")
+    
+    #Setting the ending location 
+    input_done_2 = 0
+    ending_location = 0
+    
+    while(not input_done_2):
+        input_string = input("Enter the ending location <Either 1 2 3 or 0 to quit> ")
+        print("You entered " + input_string + "\n")
 
-
-
-
-
+        if(int(input_string) == 1):
+            input_done = 1
+            ending_location = 0
+        elif (int(input_string) == 2):
+            input_done = 1
+            ending_location = 1
+        elif (int(input_string) == 3):
+            input_done = 1
+            ending_location = 2
+        elif (int(input_string) == 0):
+            print("Quitting... ")
+            sys.exit()
+        else:
+            print("Please just enter the character 1 2 3 or 0 to quit \n\n")
+    intermediate_location = 3 - starting_location - ending_location    
     ############### Your Code End Here ###############
 
     # Check if ROS is ready for operation
