@@ -35,10 +35,11 @@ Q31 = [194.53*pi/180.0, -48.50*pi/180.0, 101.58*pi/180.0, -141.51*pi/180.0, -91.
 Q32 = [194.55*pi/180.0, -54.67*pi/180.0, 100.51*pi/180.0, -134.29*pi/180.0, -91.60*pi/180.0, 104.18*pi/180.0]
 Q33 = [194.57*pi/180.0, -59.68*pi/180.0, 98.40*pi/180.0, -127.13*pi/180.0, -91.57*pi/180.0, 104.10*pi/180.0]
 
-safe_point_1 = [149.86*pi/180.0, -75.73*pi/180.0, 114.08*pi/180.0, -128.86*pi/180.0, -90.35*pi/180.0, 59.71*pi/180.0]
-safe_point_2 = [172.44*pi/180.0, -73.72*pi/180.0, 112.21*pi/180.0, -128.51*pi/180.0, -90.5*pi/180.0, 82.3*pi/180.0]
-safe_point_3 = [194.59*pi/180.0, -63.42*pi/180.0, 95.74*pi/180.0, -120.78*pi/180.0, -91.55*pi/180.0, 104.03*pi/180.0]
+safe_point_0 = [149.86*pi/180.0, -75.73*pi/180.0, 114.08*pi/180.0, -128.86*pi/180.0, -90.35*pi/180.0, 59.71*pi/180.0]
+safe_point_1 = [172.44*pi/180.0, -73.72*pi/180.0, 112.21*pi/180.0, -128.51*pi/180.0, -90.5*pi/180.0, 82.3*pi/180.0]
+safe_point_2 = [194.59*pi/180.0, -63.42*pi/180.0, 95.74*pi/180.0, -120.78*pi/180.0, -91.55*pi/180.0, 104.03*pi/180.0]
 
+safe_point_ = [safe_point_0, safe_point_1, safe_point_2]
 thetas = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
 digital_in_0 = 0
@@ -71,7 +72,8 @@ Whenever ur3/gripper_input publishes info this callback function is called.
 gripper_status = 0
 def gripper_callback(msg):
     global gripper_status
-    gripper_status = msg.analog
+    gripper_status = msg.DIGIN  
+    
 
 ############### Your Code End Here ###############
 
@@ -195,15 +197,31 @@ def move_block(pub_cmd, loop_rate, start_loc, start_height, \
     global Q
 
     ### Hint: Use the Q array to map out your towers by location and "height".
-
+    # move_arm(pub_cmd, loop_rate, dest, vel, accel):
     error = 0
+    gripper(pub_cmd, loop_rate, True)
+    time.sleep(1)
+    
+    move_arm(pub_cmd, loop_rate, safe_point_[start_loc],1.0, 1.0)
+    move_arm(pub_cmd, loop_rate, Q[start_loc][start_height],1.0, 1.0)
+    
 
+    if(gripper_status == 0):
+        print('Error didnt get a block, quitting the program')
+        #sys.exit()
+        
+    
+    move_arm(pub_cmd, loop_rate, safe_point_[start_loc],1.0, 1.0)
+    move_arm(pub_cmd, loop_rate, safe_point_[end_loc],1.0, 1.0)
+    move_arm(pub_cmd, loop_rate, Q[end_loc][end_height],1.0, 1.0)
+    
+    gripper(pub_cmd, loop_rate, False) #turns off the suction
+    
+    move_arm(pub_cmd, loop_rate, safe_point_[end_loc],1.0, 1.0)
 
     return error
 
-
 ############### Your Code End Here ###############
-
 
 def main():
 
@@ -215,7 +233,7 @@ def main():
     rospy.init_node('lab2node')
 
     # Initialize publisher for ur3/command with buffer size of 10
-    pub_command = rospy.Publisher('ur3/command', command, queue_size=10)
+    pub_cmd = rospy.Publisher('ur3/command', command, queue_size=10)
 
     # Initialize subscriber to ur3/position and callback fuction
     # each time data is published
@@ -224,6 +242,7 @@ def main():
     ############## Your Code Start Here ##############
     # TODO: define a ROS subscriber for ur3/gripper_input message and corresponding callback function
 
+    gripper_outcome = rospy.Subscriber('ur3/gripper_input', gripper_input, gripper_callback)
 
     ############### Your Code End Here ###############
 
@@ -263,13 +282,13 @@ def main():
         print("You entered " + input_string + "\n")
 
         if(int(input_string) == 1):
-            input_done = 1
+            input_done_2 = 1
             ending_location = 0
         elif (int(input_string) == 2):
-            input_done = 1
+            input_done_2 = 1
             ending_location = 1
         elif (int(input_string) == 3):
-            input_done = 1
+            input_done_2 = 1
             ending_location = 2
         elif (int(input_string) == 0):
             print("Quitting... ")
@@ -290,31 +309,40 @@ def main():
     ############## Your Code Start Here ##############
     # TODO: modify the code so that UR3 can move tower accordingly from user input
 
-    while(loop_count > 0):
+    #while(loop_count > 0):
 
-        move_arm(pub_command, loop_rate, home, 4.0, 4.0)
+     #   move_arm(pub_cmd, loop_rate, home, 4.0, 4.0)
+#
+#       rospy.loginfo("Sending goal 1 ...")
+#      move_arm(pub_cmd, loop_rate, Q[0][0], 4.0, 4.0)
+#
+#       gripper(pub_cmd, loop_rate, suction_on)
+#      # Delay to make sure suction cup has grasped the block#     time.sleep(1.0)
+#
+#       rospy.loginfo("Sending goal 2 ...")
+#      move_arm(pub_cmd, loop_rate, Q[1][1], 4.0, 4.0)
+#
+#      rospy.loginfo("Sending goal 3 ...")
+#      move_arm(pub_cmd, loop_rate, Q[2][0], 4.0, 4.0)
+#
+#       loop_count = loop_count - 1
 
-        rospy.loginfo("Sending goal 1 ...")
-        move_arm(pub_command, loop_rate, Q[0][0], 4.0, 4.0)
-
-        gripper(pub_command, loop_rate, suction_on)
-        # Delay to make sure suction cup has grasped the block
-        time.sleep(1.0)
-
-        rospy.loginfo("Sending goal 2 ...")
-        move_arm(pub_command, loop_rate, Q[1][1], 4.0, 4.0)
-
-        rospy.loginfo("Sending goal 3 ...")
-        move_arm(pub_command, loop_rate, Q[2][0], 4.0, 4.0)
-
-        loop_count = loop_count - 1
-
-    gripper(pub_command, loop_rate, suction_off)
-
-
-
+#  gripper(pub_cmd, loop_rate, suction_off) # 3 top and 1 bottom
+    move_block(pub_cmd, loop_rate, starting_location, 2, \
+               ending_location, 0)
+    move_block(pub_cmd, loop_rate, starting_location, 1, \
+               intermediate_location, 0)
+    move_block(pub_cmd, loop_rate, ending_location, 0, \
+               intermediate_location, 1)
+    move_block(pub_cmd, loop_rate, starting_location, 0, \
+               ending_location, 0)
+    move_block(pub_cmd, loop_rate, intermediate_location, 1, \
+               starting_location, 0)
+    error = move_block(pub_cmd, loop_rate, intermediate_location, 0, \
+               ending_location, 1)
+    move_block(pub_cmd, loop_rate, starting_location, 0, \
+               ending_location, 2)
     ############### Your Code End Here ###############
-
 
 if __name__ == '__main__':
 
